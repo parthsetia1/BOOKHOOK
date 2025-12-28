@@ -45,6 +45,7 @@ def create_project(
     return {"project_id": response.data[0]["id"]}
 
 
+from fastapi import UploadFile, File, Form
 from storage3.utils import StorageException
 
 @app.post("/upload_asset")
@@ -56,26 +57,32 @@ async def upload_asset(
 ):
     file_url = None
 
-    if file:
+    if file is not None:
         filename = file.filename
         content = await file.read()
         path = f"{project_id}/{filename}"
 
         try:
-            # Correct upload method for Python Supabase SDK v2
-            res = supabase.storage.from_("assets").upload(
+            # correct upload method for supabase-py v2
+            upload_res = supabase.storage.from_("assets").upload(
                 path=path,
-                file=content,
-                file_options={"content-type": file.content_type}
+                file=content,   # raw bytes
+                file_options={
+                    "content-type": file.content_type
+                }
             )
 
-            # Public URL
+            # Now get public URL
             file_url = supabase.storage.from_("assets").get_public_url(path)
 
         except StorageException as e:
-            return {"error": "Upload failed", "details": str(e)}
+            return {
+                "error": "Storage Upload Failed",
+                "details": str(e),
+                "path": path
+            }
 
-    # Insert into DB
+    # Insert into "assets" table
     response = supabase.table("assets").insert({
         "project_id": project_id,
         "type": type,
@@ -85,8 +92,10 @@ async def upload_asset(
 
     return {
         "asset_id": response.data[0]["id"],
-        "file_url": file_url
+        "file_url": file_url,
+        "dialogue": dialogue
     }
+
 
 
 
