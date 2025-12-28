@@ -3,8 +3,18 @@ from utils.supabase import insert, select, upload_file
 import requests
 import uuid
 import os
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # for development, allow all origins
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 FAL_API_KEY = os.getenv("FAL_API_KEY")
 
 @app.post("/create_project")
