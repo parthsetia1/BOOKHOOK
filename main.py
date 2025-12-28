@@ -31,16 +31,20 @@ def create_project(
     duration: int = Form(...),
     user_id: str = Form(...)
 ):
-    result = supabase.table("projects").insert({
-        "title": title,
-        "description": description,
-        "duration": duration,
-        "user_id": user_id,
-        "status": "created"
-    }).execute()
+    try:
+        response = supabase.table("projects").insert({
+            "title": title,
+            "description": description,
+            "duration": duration,
+            "user_id": user_id,
+            "status": "created"
+        }).execute()
 
-    if result.error:
-        return {"error": result.error.message}
+        if not response.data:
+            return {"error": "Insert failed"}
 
-    project_id = result.data[0]["id"]
-    return {"project_id": project_id}
+        return {"project_id": response.data[0]["id"]}
+
+    except Exception as e:
+        return {"error": str(e)}
+
