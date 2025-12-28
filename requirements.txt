@@ -4,10 +4,4 @@ supabase==2.3.4
 python-dotenv==1.0.1
 requests==2.31.0
 pydantic==2.5.2
-
-# Video processing core
-moviepy==1.0.3
-imageio==2.31.1
-imageio-ffmpeg==0.4.8
-numpy==1.26.0
-Pillow==9.5.0
+ffmpeg-python==0.2.0

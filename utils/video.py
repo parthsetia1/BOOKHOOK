@@ -1,25 +1,22 @@
 import requests
 import uuid
-from moviepy.editor import VideoFileClip, concatenate_videoclips
+import ffmpeg
 
-def download(url):
+def download_video(url):
     filename = f"{uuid.uuid4()}.mp4"
     r = requests.get(url)
-
     with open(filename, "wb") as f:
         f.write(r.content)
-
     return filename
 
-
 def merge_videos(video_urls, output="final.mp4"):
-    clips = []
+    # Download all videos
+    downloaded = [download_video(url) for url in video_urls]
 
-    for url in video_urls:
-        path = download(url)
-        clips.append(VideoFileClip(path))
+    # Create input streams
+    inputs = [ffmpeg.input(video) for video in downloaded]
 
-    final = concatenate_videoclips(clips)
-    final.write_videofile(output, fps=24)
+    # Concatenate them
+    ffmpeg.concat(*inputs, v=1, a=1).output(output).run(overwrite_output=True)
 
     return output
