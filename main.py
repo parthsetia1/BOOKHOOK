@@ -91,7 +91,53 @@ async def upload_asset(
 
 
 
+import fal_client
+import time
+from fastapi import Form
+
 @app.post("/generate_trailer")
 def generate_trailer(project_id: str = Form(...)):
-    # placeholder response to avoid 404
-    return {"status": "processing"}
+    # 1. Fetch all assets for project
+    asset_res = supabase.table("assets").select("*").eq("project_id", project_id).execute()
+
+    images = []
+    dialogues = []
+
+    for a in asset_res.data:
+        if a["type"] == "image" and a["file_url"]:
+            images.append(a["file_url"])
+        if a["type"] == "dialogue" and a["dialogue"]:
+            dialogues.append(a["dialogue"])
+
+    if not images:
+        return {"error": "No images uploaded yet"}
+
+    # 2. Create a joined prompt from dialogues
+    final_prompt = " ".join(dialogues) if dialogues else "dramatic fantasy cinematic trailer"
+
+    # 3. Call Fal AI Image-to-Video model
+    runner = fal_client.submit(
+        "fal-ai/image-to-video",
+        arguments={
+            "prompt": final_prompt,
+            "video_length": "10s",
+            "image_url": images[0]  # <-- IMPORTANT: Fal accepts one image
+        },
+        api_key=os.getenv("FAL_KEY")
+    )
+
+    # 4. Wait for Fal result
+    result = runner.get()
+    video_url = result["video"]["url"]
+
+    # 5. Save video URL into Supabase
+    supabase.table("projects").update({
+        "status": "completed",
+        "video_url": video_url
+    }).eq("id", project_id).execute()
+
+    return {
+        "status": "completed",
+        "video_url": video_url
+    }
+
