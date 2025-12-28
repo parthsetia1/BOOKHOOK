@@ -50,19 +50,45 @@ async def upload_asset(
     project_id: str = Form(...),
     type: str = Form(...),
     dialogue: str = Form(None),
-    file: UploadFile = File(None),
+    file: UploadFile = File(None)
 ):
+    file_url = None
+
+    # Upload file to storage if provided
+    if file:
+        content = await file.read()
+        filename = file.filename
+        extension = filename.split(".")[-1]
+
+        path = f"{project_id}/{filename}"
+
+        # Upload to supabase storage
+        upload = supabase.storage.from_("assets").upload(
+            path,
+            content,
+            {
+                "content-type": file.content_type
+            }
+        )
+
+        # Get public URL
+        file_url = supabase.storage.from_("assets").get_public_url(path)
+
+    # Insert into DB
     response = supabase.table("assets").insert({
         "project_id": project_id,
         "type": type,
-        "file_url": None,
+        "file_url": file_url,
         "dialogue": dialogue
     }).execute()
 
-    if not response.data:
-        return {"error": "Insert failed"}
+    return {
+        "asset_id": response.data[0]["id"],
+        "file_url": file_url,
+        "dialogue": dialogue
+    }
 
-    return {"asset_id": response.data[0]["id"]}
+
 
 
 @app.post("/generate_trailer")
