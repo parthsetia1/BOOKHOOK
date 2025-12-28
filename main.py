@@ -1,6 +1,6 @@
 from fastapi import FastAPI, Form, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
-from supabase import create_client
+from supabase.client import create_client
 import os
 
 app = FastAPI()
