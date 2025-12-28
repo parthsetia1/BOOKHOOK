@@ -2,23 +2,21 @@ FROM python:3.10-slim
 
 WORKDIR /app
 
-# Install system deps (optional)
+# Install ONLY minimal system packages
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ffmpeg \
+    curl ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements
+# Pre-install pip dependencies using binary wheels only
+RUN pip install --upgrade pip setuptools wheel
+
+# Copy only requirements first (better Docker caching)
 COPY requirements.txt .
 
-# Install Python deps
-RUN pip install --no-cache-dir -r requirements.txt
+# Force pip to use binary wheels only
+RUN pip install --no-cache-dir --prefer-binary -r requirements.txt
 
-# Copy app code
+# Copy the rest of the app
 COPY . .
 
-EXPOSE 8000
-
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
-
-
-#
