@@ -123,7 +123,7 @@ def generate_trailer(project_id: str = Form(...)):
             "video_length": "10s",
             "image_url": images[0]  # <-- IMPORTANT: Fal accepts one image
         },
-        api_key=os.getenv("FAL_KEY")
+        api_key=os.getenv("FAL_API_KEY")
     )
 
     # 4. Wait for Fal result
