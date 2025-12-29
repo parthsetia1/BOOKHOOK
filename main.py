@@ -50,6 +50,11 @@ def root():
 # -----------------------------------------------------------
 # CREATE PROJECT
 # -----------------------------------------------------------
+@app.get("/projects")
+def get_projects():
+    result = supabase.table("projects").select("*").order("created_at", desc=True).execute()
+    return result.data
+
 @app.post("/create_project")
 def create_project(
     title: str = Form(...),
