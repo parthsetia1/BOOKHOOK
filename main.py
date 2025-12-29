@@ -103,37 +103,70 @@ async def upload_asset(
 import fal_client
 from fastapi import Form
 
+VIDEO_LENGTH_MAP = {
+    "5": "5s",
+    "10": "10s",
+    "20": "20s",
+    "30": "30s",
+    "60": "60s",
+    "90": "90s"
+}
+
 @app.post("/generate_trailer")
-def generate_trailer(project_id: str = Form(...)):
-    # 1. Fetch project assets
+def generate_trailer(
+    project_id: str = Form(...),
+    duration: str = Form("10")  # default 10 seconds
+):
+
+    # 1. Fetch assets for the project
     assets = supabase.table("assets").select("*").eq("project_id", project_id).execute().data
 
+    # Separate images and dialogues
     images = [a["file_url"] for a in assets if a["type"] == "image" and a["file_url"]]
     dialogues = [a["dialogue"] for a in assets if a["type"] == "dialogue" and a["dialogue"]]
 
+    # Build prompt from all dialogues
+    prompt = " ".join(dialogues) if dialogues else "cinematic fantasy book trailer"
+
+    # Convert duration from seconds to Fal format
+    video_length = VIDEO_LENGTH_MAP.get(duration, "10s")
+
+    # 2. If no image uploaded → auto-generate image using flux-pro
     if len(images) == 0:
-        return {"error": "No images uploaded"}
+        img_gen = fal_client.submit(
+            "fal-ai/flux-pro",
+            arguments={
+                "prompt": prompt,
+                "num_inference_steps": 30,
+                "guidance_scale": 3.5,
+                "size": "768x768"
+            }
+        ).get()
 
-    prompt = " ".join(dialogues) if dialogues else "cinematic dramatic book trailer"
+        # Get generated image URL
+        img_url = img_gen["images"][0]["url"]
+        images.append(img_url)
 
-    # 2. Use new Fal API syntax (v3+)
-    runner = fal_client.submit(
+    # 3. Now generate the video using Fal AI image-to-video
+    video_task = fal_client.submit(
         "fal-ai/image-to-video",
         arguments={
             "prompt": prompt,
-            "image_url": images[0],
-            "video_length": "10s"
+            "image_url": images[0],   # use first image
+            "video_length": video_length
         }
     )
 
-    # 3. Wait for result
-    result = runner.get()
+    result = video_task.get()
     video_url = result["video"]["url"]
 
-    # 4. Save result in Supabase
-    supabase.table("projects").update({
-        "status": "completed",
-        "video_url": video_url
-    }).eq("id", project_id).execute()
+    # 4. Save video in Supabase
+    supabase.table("projects").update(
+        {"status": "completed", "video_url": video_url}
+    ).eq("id", project_id).execute()
 
-    return {"video_url": video_url, "status": "completed"}
+    return {
+        "status": "completed",
+        "video_url": video_url,
+        "duration": duration
+    }
