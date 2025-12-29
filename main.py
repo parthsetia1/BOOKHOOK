@@ -101,52 +101,39 @@ async def upload_asset(
 
 
 import fal_client
-import time
 from fastapi import Form
 
 @app.post("/generate_trailer")
 def generate_trailer(project_id: str = Form(...)):
-    # 1. Fetch all assets for project
-    asset_res = supabase.table("assets").select("*").eq("project_id", project_id).execute()
+    # 1. Fetch project assets
+    assets = supabase.table("assets").select("*").eq("project_id", project_id).execute().data
 
-    images = []
-    dialogues = []
+    images = [a["file_url"] for a in assets if a["type"] == "image" and a["file_url"]]
+    dialogues = [a["dialogue"] for a in assets if a["type"] == "dialogue" and a["dialogue"]]
 
-    for a in asset_res.data:
-        if a["type"] == "image" and a["file_url"]:
-            images.append(a["file_url"])
-        if a["type"] == "dialogue" and a["dialogue"]:
-            dialogues.append(a["dialogue"])
+    if len(images) == 0:
+        return {"error": "No images uploaded"}
 
-    if not images:
-        return {"error": "No images uploaded yet"}
+    prompt = " ".join(dialogues) if dialogues else "cinematic dramatic book trailer"
 
-    # 2. Create a joined prompt from dialogues
-    final_prompt = " ".join(dialogues) if dialogues else "dramatic fantasy cinematic trailer"
-
-    # 3. Call Fal AI Image-to-Video model
+    # 2. Use new Fal API syntax (v3+)
     runner = fal_client.submit(
         "fal-ai/image-to-video",
         arguments={
-            "prompt": final_prompt,
-            "video_length": "10s",
-            "image_url": images[0]  # <-- IMPORTANT: Fal accepts one image
-        },
-        api_key=os.getenv("FAL_API_KEY")
+            "prompt": prompt,
+            "image_url": images[0],
+            "video_length": "10s"
+        }
     )
 
-    # 4. Wait for Fal result
+    # 3. Wait for result
     result = runner.get()
     video_url = result["video"]["url"]
 
-    # 5. Save video URL into Supabase
+    # 4. Save result in Supabase
     supabase.table("projects").update({
         "status": "completed",
         "video_url": video_url
     }).eq("id", project_id).execute()
 
-    return {
-        "status": "completed",
-        "video_url": video_url
-    }
-
+    return {"video_url": video_url, "status": "completed"}
