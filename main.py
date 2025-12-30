@@ -174,15 +174,18 @@ def generate_trailer(
 
     # Generate book trailer video
     video_task = fal_client.submit(
-        "fal-ai/flux-pro/v1.1",
+        "fal-ai/runway-gen2",
         arguments={
-            "prompt": prompt,
             "image_url": images[0],
-            "duration": video_length
+            "prompt": prompt,
+            "duration": video_length  # integer seconds
         }
     )
 
     result = video_task.get()
+
+    if "video" not in result:
+        return {"error": "Video generation failed", "detail": result}
 
     video_url = result["video"]["url"]
 
