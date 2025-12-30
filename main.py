@@ -11,6 +11,8 @@ from storage3.utils import StorageException
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 FAL_KEY = os.getenv("FAL_KEY")
+fal_client.global_config.api_key = FAL_KEY
+
 print("FAL KEY:", os.getenv("FAL_KEY"))
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
@@ -179,11 +181,11 @@ def generate_trailer(
             "prompt": prompt,
             "image_url": images[0],
             "duration": video_length
-        },
-        api_key=FAL_KEY
+        }
     )
 
     result = video_task.get()
+
     video_url = result["video"]["url"]
 
     # Save in DB
