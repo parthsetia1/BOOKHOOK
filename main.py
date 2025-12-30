@@ -139,64 +139,48 @@ def generate_trailer(
     duration: str = Form("10")
 ):
 
-    # Fetch assets
     assets = supabase.table("assets").select("*").eq("project_id", project_id).execute().data
 
     images = [a["file_url"] for a in assets if a["type"] == "image" and a["file_url"]]
     dialogues = [a["dialogue"] for a in assets if a["type"] == "dialogue" and a["dialogue"]]
 
-    prompt = " ".join(dialogues) if dialogues else "cinematic dramatic fantasy book trailer"
-
+    prompt = " ".join(dialogues) if dialogues else "cinematic book trailer teaser"
+    
     VIDEO_LENGTH_MAP = {
-        "5": 5,
-        "10": 10,
-        "20": 20,
-        "30": 30,
-        "60": 60,
-        "90": 90,
+        "5": 5, "10": 10, "20": 20, "30": 30, "60": 60, "90": 90
     }
 
     video_length = VIDEO_LENGTH_MAP.get(duration, 10)
 
-    # Auto-generate image if none were uploaded
+    # Auto-generate an image if user uploaded none
     if len(images) == 0:
         img_gen = fal_client.submit(
             "fal-ai/flux-pro/v1.1",
-            arguments={
-                "prompt": prompt,
-                "num_inference_steps": 30,
-                "guidance_scale": 3.5,
-                "size": "768x768"
-            }
+            arguments={"prompt": prompt}
         ).get()
 
         images.append(img_gen["images"][0]["url"])
 
-    # Generate book trailer video
+    # Generate video using Fal AI Dream Machine
     video_task = fal_client.submit(
-        "fal-ai/runway-gen2",
+        "fal-ai/luma-dream-machine",
         arguments={
-            "image_url": images[0],
             "prompt": prompt,
-            "duration": video_length  # integer seconds
+            "image_url": images[0],
+            "duration": video_length,
         }
     )
 
     result = video_task.get()
 
     if "video" not in result:
-        return {"error": "Video generation failed", "detail": result}
+        return {"error": "Fal did not return a video", "detail": result}
 
     video_url = result["video"]["url"]
 
-    # Save in DB
     supabase.table("projects").update({
         "status": "completed",
         "video_url": video_url
     }).eq("id", project_id).execute()
 
-    return {
-        "status": "completed",
-        "video_url": video_url,
-        "duration": duration
-    }
+    return {"status": "completed", "video_url": video_url}
