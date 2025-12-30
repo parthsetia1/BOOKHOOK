@@ -135,57 +135,58 @@ async def upload_asset(
 @app.post("/generate_trailer")
 def generate_trailer(
     project_id: str = Form(...),
-    duration: str = Form("10")  # 10 sec default
+    duration: str = Form("10")
 ):
 
-    # -------------------------------------------------------
-    # STEP 1 — Fetch assets
-    # -------------------------------------------------------
+    # Fetch assets
     assets = supabase.table("assets").select("*").eq("project_id", project_id).execute().data
 
     images = [a["file_url"] for a in assets if a["type"] == "image" and a["file_url"]]
     dialogues = [a["dialogue"] for a in assets if a["type"] == "dialogue" and a["dialogue"]]
 
-    # Build prompt from dialogues OR fallback generic prompt
     prompt = " ".join(dialogues) if dialogues else "cinematic dramatic fantasy book trailer"
 
-    # Validate duration
-    video_length = VIDEO_LENGTH_MAP.get(duration, "10s")
+    VIDEO_LENGTH_MAP = {
+        "5": 5,
+        "10": 10,
+        "20": 20,
+        "30": 30,
+        "60": 60,
+        "90": 90,
+    }
 
-    # -------------------------------------------------------
-    # STEP 2 — If user didn’t upload images → auto-generate using text
-    # -------------------------------------------------------
+    video_length = VIDEO_LENGTH_MAP.get(duration, 10)
+
+    # Auto-generate image if none were uploaded
     if len(images) == 0:
         img_gen = fal_client.submit(
-            "fal-ai/flux-pro",
+            "fal-ai/flux-pro/v1.1",
             arguments={
                 "prompt": prompt,
                 "num_inference_steps": 30,
                 "guidance_scale": 3.5,
                 "size": "768x768"
-            }
+            },
+            api_key=FAL_KEY
         ).get()
 
         images.append(img_gen["images"][0]["url"])
 
-    # -------------------------------------------------------
-    # STEP 3 — Generate AI Video
-    # -------------------------------------------------------
+    # Generate book trailer video
     video_task = fal_client.submit(
-        "fal-ai/image-to-video",
+        "fal-ai/flux-pro/v1.1",
         arguments={
             "prompt": prompt,
             "image_url": images[0],
-            "video_length": video_length
-        }
+            "duration": video_length
+        },
+        api_key=FAL_KEY
     )
 
     result = video_task.get()
     video_url = result["video"]["url"]
 
-    # -------------------------------------------------------
-    # STEP 4 — Save output in DB
-    # -------------------------------------------------------
+    # Save in DB
     supabase.table("projects").update({
         "status": "completed",
         "video_url": video_url
