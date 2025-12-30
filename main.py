@@ -11,7 +11,6 @@ from storage3.utils import StorageException
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 FAL_KEY = os.getenv("FAL_KEY")
-fal_client.global_config.api_key = FAL_KEY
 
 print("FAL KEY:", os.getenv("FAL_KEY"))
 
