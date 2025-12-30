@@ -1,11 +1,11 @@
 import os
 import requests
 
-FAL_API_KEY = os.getenv("FAL_API_KEY")
+FAL_KEY = os.getenv("FAL_KEY")
 
 def generate_scene(prompt: str):
     url = "https://api.fal.ai/fal-ai/animatediff"
-    headers = {"Authorization": f"Key {FAL_API_KEY}"}
+    headers = {"Authorization": f"Key {FAL_KEY}"}
 
     payload = {"prompt": prompt}
 
