@@ -58,10 +58,11 @@ def get_projects():
 @app.post("/create_project")
 def create_project(
     title: str = Form(...),
-    description: str = Form(...),
-    duration: str = Form(...),
-    user_id: str = Form(...)
+    duration: int = Form(...),
+    user_id: str = Form(...),
+    description: str = Form("")   # make optional with default ""
 ):
+
     response = supabase.table("projects").insert({
         "title": title,
         "description": description,
