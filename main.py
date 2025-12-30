@@ -167,8 +167,7 @@ def generate_trailer(
                 "num_inference_steps": 30,
                 "guidance_scale": 3.5,
                 "size": "768x768"
-            },
-            api_key=FAL_KEY
+            }
         ).get()
 
         images.append(img_gen["images"][0]["url"])
