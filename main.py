@@ -139,48 +139,72 @@ def generate_trailer(
     duration: str = Form("10")
 ):
 
+    # ---------------------------
+    # 1. Fetch assets
+    # ---------------------------
     assets = supabase.table("assets").select("*").eq("project_id", project_id).execute().data
 
     images = [a["file_url"] for a in assets if a["type"] == "image" and a["file_url"]]
     dialogues = [a["dialogue"] for a in assets if a["type"] == "dialogue" and a["dialogue"]]
 
     prompt = " ".join(dialogues) if dialogues else "cinematic book trailer teaser"
-    
-    VIDEO_LENGTH_MAP = {
-        "5": 5, "10": 10, "20": 20, "30": 30, "60": 60, "90": 90
-    }
 
+    VIDEO_LENGTH_MAP = {"5": 5, "10": 10, "20": 20, "30": 30, "60": 60, "90": 90}
     video_length = VIDEO_LENGTH_MAP.get(duration, 10)
 
-    # Auto-generate an image if user uploaded none
+    # ---------------------------
+    # 2. If no image → auto generate from prompt
+    # ---------------------------
     if len(images) == 0:
         img_gen = fal_client.submit(
             "fal-ai/flux-pro/v1.1",
             arguments={"prompt": prompt}
         ).get()
-
         images.append(img_gen["images"][0]["url"])
 
-    # Generate video using Fal AI Dream Machine
+    # ---------------------------
+    # 3. Generate AI video using Luma Dream Machine
+    # ---------------------------
     video_task = fal_client.submit(
         "fal-ai/luma-dream-machine",
         arguments={
             "prompt": prompt,
-            "image_url": images[0],
-            "duration": video_length,
+            "init_image_url": images[0],   # <-- Correct key
+            "duration": video_length
         }
     )
 
     result = video_task.get()
 
     if "video" not in result:
-        return {"error": "Fal did not return a video", "detail": result}
+        return {"error": "Fal did not return video", "detail": result}
 
-    video_url = result["video"]["url"]
+    fal_video_url = result["video"]["url"]
 
+    # ---------------------------
+    # 4. Upload video to Supabase Storage
+    # ---------------------------
+    import requests
+    video_bytes = requests.get(fal_video_url).content
+
+    file_name = f"{project_id}.mp4"
+    upload_resp = supabase.storage.from_("videos").upload(
+        file=file_name,
+        file_content=video_bytes,
+        file_options={"content-type": "video/mp4", "upsert": True}
+    )
+
+    public_url = supabase.storage.from_("videos").get_public_url(file_name)
+
+    # ---------------------------
+    # 5. Save permanent URL to DB
+    # ---------------------------
     supabase.table("projects").update({
         "status": "completed",
-        "video_url": video_url
+        "video_url": public_url
     }).eq("id", project_id).execute()
 
-    return {"status": "completed", "video_url": video_url}
+    return {
+        "status": "completed",
+        "video_url": public_url
+    }
